@@ -22,3 +22,7 @@ output "private_instances_security_group" {
   value = aws_security_group.private_instances_security_group.id
 }
 
+output "bastion_role" {
+  value = aws_iam_role.bastion_host_role.arn
+}
+
