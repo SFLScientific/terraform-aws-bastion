@@ -1,6 +1,12 @@
 variable "bucket_name" {
   description = "Bucket name were the bastion will store the logs"
 }
+variable "passphrase" {
+  description = "passphrase to use to decrypt kubeconfig"
+}
+variable "team" {
+  description = "team deploying this bastion"
+}
 
 variable "bucket_versioning" {
   default     = true

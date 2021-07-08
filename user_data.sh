@@ -86,7 +86,7 @@ service sshd restart
 
 #########################################
 ## Install kubectl, aws-iam-auth and eksctl
-#######################################
+#########################################
 
 # kubectl
 curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.20.4/2021-04-12/bin/linux/amd64/kubectl
@@ -187,6 +187,35 @@ fi
 EOF
 
 chmod 700 /usr/bin/bastion/sync_users
+
+###########################################
+## GET_KUBECONFIG                        ##
+###########################################
+
+cat > /usr/bin/get_kubeconfig << EOF
+#!/usr/bin/env bash
+# make .kube for config
+mkdir /home/ec2-user/.kube
+# download kubeconfig from S3
+aws s3 cp s3://${bucket_name}/kubeconfig_${team}-eks-cluster.gpg /tmp/kubeconfig.gpg
+# decrypt it using the passphrase
+gpg -d --batch --passphrase ${passphrase} /tmp/kubeconfig.gpg > /home/ec2-user/.kube/config
+
+EOF
+
+chmod +x /usr/bin/get_kubeconfig
+
+###########################################
+## TERRAFORM                             ##
+###########################################
+
+
+yum install -y yum-utils
+
+yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+
+yum -y install terraform
+
 
 ###########################################
 ## SCHEDULE SCRIPTS AND SECURITY UPDATES ##

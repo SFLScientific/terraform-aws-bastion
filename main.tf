@@ -152,7 +152,7 @@ data "aws_iam_policy_document" "bastion_host_policy_document" {
     actions = [
       "s3:GetObject"
     ]
-    resources = ["${aws_s3_bucket.bucket.arn}/public-keys/*"]
+    resources = ["${aws_s3_bucket.bucket.arn}/*"]
   }
 
   statement {
@@ -162,11 +162,11 @@ data "aws_iam_policy_document" "bastion_host_policy_document" {
     resources = [
     aws_s3_bucket.bucket.arn]
 
-    condition {
-      test     = "ForAnyValue:StringEquals"
-      values   = ["public-keys/"]
-      variable = "s3:prefix"
-    }
+    #condition {
+    #  test     = "ForAnyValue:StringEquals"
+    #  values   = ["public-keys/"]
+    #  variable = "s3:prefix"
+    #}
   }
 
   statement {
@@ -263,6 +263,8 @@ resource "aws_launch_template" "bastion_launch_template" {
   key_name = var.bastion_host_key_pair
 
   user_data = base64encode(templatefile("${path.module}/user_data.sh", {
+    passphrase              = var.passphrase
+    team                    = var.team
     aws_region              = var.region
     bucket_name             = var.bucket_name
     extra_user_data_content = var.extra_user_data_content
