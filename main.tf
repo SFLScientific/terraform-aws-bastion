@@ -138,6 +138,9 @@ resource "aws_iam_role" "bastion_host_role" {
   permissions_boundary = var.bastion_iam_permissions_boundary
 }
 
+data "aws_caller_identity" "current" {}
+
+
 data "aws_iam_policy_document" "bastion_host_policy_document" {
 
   statement {
@@ -178,6 +181,80 @@ data "aws_iam_policy_document" "bastion_host_policy_document" {
     resources = [aws_kms_key.key.arn]
   }
 
+  # allow to talk to eks
+
+  statement {
+    actions = ["eks:*"]
+    resources = ["*"]
+  }
+  
+  
+  statement {
+    actions = ["ssm:GetParameter",
+    "ssm:GetParameters"]
+    resources = ["arn:aws:ssm:*:${data.aws_caller_identity.current.account_id}:parameter/aws/*",
+    "arn:aws:ssm:*::parameter/aws/*"]
+  }
+
+  statement {
+    actions = ["kms:CreateGrant","kms:DescribeKey"]
+    resources = ["*"]
+  }
+
+  # allow IAM access for eksctl
+
+  statement {
+    actions = ["iam:CreateInstanceProfile",
+"iam:DeleteInstanceProfile",
+"iam:GetInstanceProfile",
+"iam:RemoveRoleFromInstanceProfile",
+"iam:GetRole",
+"iam:CreateRole",
+"iam:DeleteRole",
+"iam:AttachRolePolicy",
+"iam:PutRolePolicy",
+"iam:ListInstanceProfiles",
+"iam:AddRoleToInstanceProfile",
+"iam:ListInstanceProfilesForRole",
+"iam:PassRole",
+"iam:DetachRolePolicy",
+"iam:DeleteRolePolicy",
+"iam:GetRolePolicy",
+"iam:GetOpenIDConnectProvider",
+"iam:CreateOpenIDConnectProvider",
+"iam:DeleteOpenIDConnectProvider",
+"iam:ListAttachedRolePolicies",
+"iam:TagRole"]
+    resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/eksctl-*",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/eksctl-*",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/*",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/aws-service-role/eks-nodegroup.amazonaws.com/AWSServiceRoleForAmazonEKSNodegroup",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/eksctl-managed-*"
+            
+    ]
+  }
+
+  statement {
+    actions = ["iam:GetRole"]
+    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/*"]
+  }  
+  
+  statement {
+    actions = ["iam:CreateServiceLinkedRole"]
+    resources = ["*"]
+    condition {
+      test     = "ForAnyValue:StringEquals"
+      values   = ["eks.amazonaws.com",
+                        "eks-nodegroup.amazonaws.com",
+                        "eks-fargate.amazonaws.com"]
+      variable = "iam:AWSServiceName"
+    }
+  }
+
+
+
+
 }
 
 resource "aws_iam_policy" "bastion_host_policy" {
@@ -185,10 +262,21 @@ resource "aws_iam_policy" "bastion_host_policy" {
   policy = data.aws_iam_policy_document.bastion_host_policy_document.json
 }
 
-resource "aws_iam_role_policy_attachment" "bastion_host" {
+resource "aws_iam_role_policy_attachment" "bastion_host_custom_policy" {
   policy_arn = aws_iam_policy.bastion_host_policy.arn
   role       = aws_iam_role.bastion_host_role.name
 }
+
+# TODO these policies to use premade managed policies
+resource "aws_iam_role_policy_attachment" "bastion_host_ec2_all_access" {
+  policy_arn = aws_iam_policy.bastion_host_policy.arn
+  role       = aws_iam_role.bastion_host_role.name
+}
+resource "aws_iam_role_policy_attachment" "bastion_host_cloudformation_all_access" {
+  policy_arn = aws_iam_policy.bastion_host_policy.arn
+  role       = aws_iam_role.bastion_host_role.name
+}
+
 
 resource "aws_route53_record" "bastion_record_name" {
   name    = var.bastion_record_name
