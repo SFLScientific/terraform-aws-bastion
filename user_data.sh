@@ -216,6 +216,17 @@ yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/has
 
 yum -y install terraform
 
+###########################################
+## KFCTL                                 ##
+###########################################
+
+startdir=$(pwd)
+cd /tmp
+wget https://github.com/kubeflow/kfctl/releases/download/v1.2.0/kfctl_v1.2.0-0-gbc038f9_linux.tar.gz
+tar -xzvf kfctl_v1.2.0-0-gbc038f9_linux.tar.gz
+chmod +x kfctl
+mv kfctl /usr/bin/
+cd $startdir
 
 ###########################################
 ## SCHEDULE SCRIPTS AND SECURITY UPDATES ##
