@@ -229,6 +229,13 @@ mv kfctl /usr/bin/
 cd $startdir
 
 ###########################################
+## Helm                                  ##
+###########################################
+
+curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+
+
+###########################################
 ## SCHEDULE SCRIPTS AND SECURITY UPDATES ##
 ###########################################
 
