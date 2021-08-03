@@ -1,0 +1,44 @@
+name: MD to PDF
+# only run if .md updated
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - '**.md'
+jobs:
+  makepdfs:
+    runs-on: ubuntu-latest
+    if: ${{ (github.repository != 'SFLScientific/SFL-Template') }}
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.head_ref }}
+    # converts all special chars to safe in the mds and makes backups
+    - name: Format trees in MDs
+      run: for F in $(find | grep -i "readme"); do cp $F $F.orig && sed -i 's/├/\+/g; s/│/\|/g;  s/─/-/g; s/└/\\/g' $F;done
+    - name: MD to PDF conversion
+      uses: SFLScientific/MDtoPDF@1.0.3
+    # move original mds back into place
+    - name: Move original MDs back
+      run: for F in $(find | grep -i ".md.orig"); do mv $F $(echo $F | sed 's/.orig//g') ;done
+    # remove all .pdf.orig pdfs that were untracked and not readme
+    - name: Remove .pdf.orig files
+      run: for pdf in $(find | grep ".pdf.orig"); do rm $pdf; done  
+    - name: Create Pull Request
+      id: cpr
+      uses: peter-evans/create-pull-request@v3.10.0
+      with:
+        commit-message: PR with converted to PDF
+        committer: AutoCommit <example@users.noreply.github.com>
+        title: File conversions MD_to_PDF
+        body: This is an auto-generated PR
+        labels: pdfs, automated pr
+        branch: ${{ format('md-to-pdf_{0}', github.head_ref) }}
+    - name: Merge Pull Request
+      uses: juliangruber/merge-pull-request-action@v1
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        number: ${{ steps.cpr.outputs.pull-request-number }}
+        method: squash

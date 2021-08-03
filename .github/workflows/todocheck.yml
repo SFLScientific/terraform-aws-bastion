@@ -1,0 +1,16 @@
+name: TODO and comment check
+on: 
+  pull_request:
+    branches:
+      - main
+      - master
+jobs:
+  spelling:
+    runs-on: ubuntu-latest
+    if: ${{ (github.repository != 'SFLScientific/SFL-Template') && (github.head_ref != 'template-action-updates')}}
+    steps:
+    - uses: actions/checkout@v2
+    - name: TODO and Commented out code status check
+      uses: SFLScientific/TODOandCommentedCodeCheck@1.3
+
+    
