@@ -243,13 +243,10 @@ cat > /usr/bin/setup_kubeflow << EOF
 cd /tmp
 
 # make kfctl yaml file
-export CONFIG_URI="https://raw.githubusercontent.com/kubeflow/manifests/v1.2-branch/kfdef/kfctl_aws.v1.2.0.yaml"
 
-export AWS_CLUSTER_NAME=${team}-eks-cluster
+mkdir ${team}-eks-cluster && cd ${team}-eks-cluster
 
-mkdir ${AWS_CLUSTER_NAME} && cd ${AWS_CLUSTER_NAME}
-
-wget -O kfctl_aws.yaml $CONFIG_URI
+wget -O kfctl_aws.yaml https://raw.githubusercontent.com/kubeflow/manifests/v1.2-branch/kfdef/kfctl_aws.v1.2.0.yaml
 
 # fix a aws bug
 aws configure set default.region us-east-2
