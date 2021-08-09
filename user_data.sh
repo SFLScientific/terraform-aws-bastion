@@ -249,7 +249,7 @@ mkdir ${team}-eks-cluster && cd ${team}-eks-cluster
 wget -O kfctl_aws.yaml https://raw.githubusercontent.com/kubeflow/manifests/v1.2-branch/kfdef/kfctl_aws.v1.2.0.yaml
 
 # fix a aws bug
-aws configure set default.region us-east-2
+aws configure set default.region ${aws_region}
 
 # exit the yaml
 
