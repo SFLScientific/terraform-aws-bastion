@@ -234,6 +234,41 @@ cd $startdir
 
 curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
+###########################################
+## Kubeflow automation                   ##
+###########################################
+
+cat > /usr/bin/setup_kubeflow << EOF
+#!/usr/bin/env bash
+cd /tmp
+
+# make kfctl yaml file
+export CONFIG_URI="https://raw.githubusercontent.com/kubeflow/manifests/v1.2-branch/kfdef/kfctl_aws.v1.2.0.yaml"
+
+export AWS_CLUSTER_NAME=${team}-eks-cluster
+
+mkdir ${AWS_CLUSTER_NAME} && cd ${AWS_CLUSTER_NAME}
+
+wget -O kfctl_aws.yaml $CONFIG_URI
+
+# fix a aws bug
+aws configure set default.region us-east-2
+
+# exit the yaml
+
+# edit region
+sed -i 's/us-west-2/${aws_region}/g' kfctl_aws.yaml
+# edit pod policy
+sed -i 's/enablePodIamPolicy/#enablePodIamPolicy/g' kfctl_aws.yaml
+
+# deploy kubeflow
+kfctl apply -V -f kfctl_aws.yaml
+
+
+EOF
+
+chmod +x /usr/bin/setup_kubeflow
+
 
 ###########################################
 ## SCHEDULE SCRIPTS AND SECURITY UPDATES ##
