@@ -195,7 +195,9 @@ chmod 700 /usr/bin/bastion/sync_users
 cat > /usr/bin/get_kubeconfig << EOF
 #!/usr/bin/env bash
 # make .kube for config
-mkdir /home/ec2-user/.kube
+mkdir -p /home/ec2-user/.kube
+# error if s3 file fails / if file doesnt exist
+set -e
 # download kubeconfig from S3
 aws s3 cp s3://${bucket_name}/kubeconfig_${team}-eks-cluster.gpg /tmp/kubeconfig.gpg
 # decrypt it using the passphrase
@@ -235,7 +237,7 @@ cd $startdir
 curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 
 ###########################################
-## Kubeflow automation                   ##
+## Kubeflow setup script                 ##
 ###########################################
 
 cat > /usr/bin/setup_kubeflow << EOF
@@ -243,28 +245,182 @@ cat > /usr/bin/setup_kubeflow << EOF
 cd /tmp
 
 # make kfctl yaml file
-
+echo "making setup folder"
+echo "making setup folder" > /var/log/setup_kubeflow.log
 mkdir ${team}-eks-cluster && cd ${team}-eks-cluster
-
+echo "getting base config"
+echo "getting base config" > /var/log/setup_kubeflow.log
 wget -O kfctl_aws.yaml https://raw.githubusercontent.com/kubeflow/manifests/v1.2-branch/kfdef/kfctl_aws.v1.2.0.yaml
 
 # fix a aws bug
 aws configure set default.region ${aws_region}
 
-# exit the yaml
-
+# edit the yaml
+echo "editing config"
+echo "editing config" > /var/log/setup_kubeflow.log
 # edit region
 sed -i 's/us-west-2/${aws_region}/g' kfctl_aws.yaml
 # edit pod policy
 sed -i 's/enablePodIamPolicy/#enablePodIamPolicy/g' kfctl_aws.yaml
-
+echo "deploying kubeflow from config"
+echo "deploying kubeflow from config" > /var/log/setup_kubeflow.log
 # deploy kubeflow
 kfctl apply -V -f kfctl_aws.yaml
-
+echo "done!"
+echo "done!" > /var/log/setup_kubeflow.log
 
 EOF
 
 chmod +x /usr/bin/setup_kubeflow
+
+
+###########################################
+## Kubeflow and kubeconfig auto setup    ##
+###########################################
+
+
+cat > /usr/bin/auto_setup << EOF
+#!/usr/bin/env bash
+
+# kubectl
+# try to get the kubeconfig from S3
+# if it fails, try again in 60s
+echo "setting up kubeflow and kubeconfig"
+echo "setting up kubeflow and kubeconfig" > /var/log/auto_setup.log
+count=1
+while [ \$count -le 10 ]
+do
+  ((count++))
+  if [ \$count -eq 10 ]
+  then
+    echo "couldnt get kubeconfig after 10 attempts skipping"
+    echo "couldnt get kubeconfig after 10 attempts skipping" > /var/log/auto_setup.log
+    break
+  fi
+  # try to get kubeconfig
+  /usr/bin/get_kubeconfig
+  # if it worked, exit loop
+  ret=\$?
+  if [ \$ret -eq 0 ]; then
+    echo "setup kubeconfig"
+    echo "setup kubeconfig" > /var/log/auto_setup.log
+    break
+  fi
+  # if failed to get kubeconfig, wait and try again
+  echo "failed to get kubeconfig, waiting 60s and trying again"
+  echo "failed to get kubeconfig, waiting 60s and trying again" > /var/log/auto_setup.log
+  sleep 60
+done
+
+echo "checking if kubeflow is already running"
+echo "checking if kubeflow is already running" > /var/log/auto_setup.log
+
+# check if kubeflow is already existing
+kubectl get namespace | grep kubeflow
+ret=\$?
+# if kubeflow namespace is found, exit
+if [ \$ret -eq 0 ]; then
+  echo "kubeflow already deployed"
+  echo "kubeflow already deployed" > /var/log/auto_setup.log
+  exit 0
+fi
+echo "deploying kubeflow in 120s"
+echo "deploying kubeflow in 120s" > /var/log/auto_setup.log
+sleep 120
+
+echo "deploying"
+echo "deploying" > /var/log/auto_setup.log
+# kubeflow is not yet set up
+# set it up via setup_kubeflow command
+/usr/bin/setup_kubeflow
+
+EOF
+
+chmod +x /usr/bin/auto_setup
+
+
+
+###########################################
+## Kubeflow proxy background script      ##
+###########################################
+
+cat > /usr/bin/route_kubeflow << EOF
+#!/usr/bin/env bash
+
+# while true
+#   if istio-ingress-gateway pod exists
+#      if proxy not running
+#          wait 30s then start port forward
+#       else
+#         shouldnt be here, but exit 
+#   # are only here if gateway pod is gone / kubeflow not set up yet
+#   wait 60s for kubeflow to be started
+
+# below is 0 if ingress-gateway pod exists, 1 if not 
+# kubectl get pods --namespace istio-system | grep ingressgateway
+
+
+# if below isnt 0, then proxy is running
+# ps -ef | grep port-forward | grep ingressgateway | grep 3100 | wc -l
+
+
+# wait for pod to come online fully, just in case
+# sleep 60
+# start proxy to 3100 of the ingress gateway
+# kubectl port-forward pods/$(kubectl get pods --namespace istio-system | grep ingressgateway | cut -d" " -f 1) 3100:80 --namespace istio-system > /dev/null 2&>1
+
+echo "starting route_kubeflow"
+echo "starting route_kubeflow" > /home/ec2-user/route.log
+
+# implimentation
+while :
+do
+
+  kubectl get pods --namespace istio-system | grep ingressgateway
+  ret=\$?
+  if [ \$ret -eq 0 ]; then
+    # kubeflow has been deployed and the pod exists
+    echo "kubeflow deployed"
+    echo "kubeflow deployed" > /home/ec2-user/route.log
+
+    # check if the proxy is already running / if this exec has already been called
+    ret=\$(ps -ef | grep port-forward | grep ingressgateway | grep 3100 | wc -l)
+    if [ \$ret -eq 0 ]; then
+      # proxy isnt yet running
+      echo "proxy not yet running"
+      echo "proxy not yet running" > /home/ec2-user/route.log
+
+      # wait for pod to come online fully, just in case
+      sleep 60
+      # start proxy to 3100 of the ingress gateway
+      nohup kubectl port-forward pods/\$(kubectl get pods --namespace istio-system | grep ingressgateway | cut -d" " -f 1) 3100:80 --namespace istio-system > /dev/null 2&>1 &
+      echo "proxy started"
+      echo "proxy started" > /home/ec2-user/route.log
+      echo "connect to localhost:3100 to connect to kubeflow"
+      exit 0
+    else
+      # proxy is already running
+      echo "proxy already running"
+      echo "proxy already running" > /home/ec2-user/route.log
+      echo "connect to localhost:3100 to connect to kubeflow"
+      exit 0
+    fi
+    
+  fi
+
+  # wait for pod to exist / kubeflow to be set up by a user
+  echo "waiting for kubeflow to start"
+  echo "waiting for kubeflow to start" > /home/ec2-user/route.log
+  sleep 60
+
+done
+
+EOF
+
+chmod +x /usr/bin/route_kubeflow
+
+
+
 
 
 ###########################################
@@ -285,3 +441,16 @@ rm ~/mycron
 #######################################
 
 ${extra_user_data_content}
+
+
+
+# set up the auto setup as ec2 user
+sudo -u ec2-user bash /usr/bin/auto_setup
+
+
+echo "nick"
+
+# start kubeflow routing when bastion starts as ec2-user
+nohup /usr/bin/route_kubeflow > /tmp/routelogs 2&>1 &
+
+nohup bash -c "sleep 600 & echo ahoy > /var/log/ahoy"
