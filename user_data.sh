@@ -251,7 +251,7 @@ echo "making setup folder" >> /tmp/setup.log
 mkdir ${team}-eks-cluster && cd ${team}-eks-cluster
 echo "getting base config"
 echo "getting base config" >> /tmp/setup.log
-wget -O kfctl_aws.yaml https://raw.githubusercontent.com/kubeflow/manifests/v1.2-branch/kfdef/kfctl_aws.v1.2.0.yaml
+wget -O kfctl_aws.yaml https://raw.githubusercontent.com/kubeflow/manifests/v1.2-branch/kfdef/kfctl_aws.v1.2.0.yaml >> /tmp/setup.log
 
 # fix a aws bug
 aws configure set default.region ${aws_region}
@@ -265,8 +265,18 @@ sed -i 's/us-west-2/${aws_region}/g' kfctl_aws.yaml
 sed -i 's/enablePodIamPolicy/#enablePodIamPolicy/g' kfctl_aws.yaml
 echo "deploying kubeflow from config"
 echo "deploying kubeflow from config" >> /tmp/setup.log
+
+echo "path is" >> /tmp/setup.log
+echo \$PATH >> /tmp/setup.log
+
+export PATH="/usr/local/bin:\$PATH"
+
+echo "path is" >> /tmp/setup.log
+echo \$PATH >> /tmp/setup.log
+
+
 # deploy kubeflow
-kfctl apply -V -f kfctl_aws.yaml
+kfctl apply -V -f kfctl_aws.yaml >> /tmp/setup.log
 echo "done!"
 echo "done!" >> /tmp/setup.log
 
@@ -327,8 +337,8 @@ if [ \$ret -eq 0 ]; then
   echo "kubeflow already deployed" >> /tmp/auto_setup.log
   exit 0
 fi
-echo "deploying kubeflow in 120s"
-echo "deploying kubeflow in 120s" >> /tmp/auto_setup.log
+echo "deploying kubeflow in 120"
+echo "deploying kubeflow in 120" >> /tmp/auto_setup.log
 sleep 120
 
 echo "deploying"
@@ -336,6 +346,9 @@ echo "deploying" >> /tmp/auto_setup.log
 # kubeflow is not yet set up
 # set it up via setup_kubeflow command
 echo "further output in /tmp/setup.log" >> /tmp/auto_setup.log
+
+echo "path is" >> /tmp/auto_setup.log
+echo \$PATH >> /tmp/auto_setup.log
 /usr/bin/setup_kubeflow
 
 EOF
@@ -382,7 +395,8 @@ echo "starting route_kubeflow" >> /tmp/route.log
 while :
 do
 
-  kubectl get pods --namespace istio-system | grep ingressgateway
+  kubectl get pods --namespace istio-system | grep ingressgateway | grep "1/1" >> /tmp/route.log
+  kubectl get pods --namespace istio-system | grep ingressgateway | grep "1/1"
   ret=\$?
   if [ \$ret -eq 0 ]; then
     # kubeflow has been deployed and the pod exists
@@ -399,7 +413,7 @@ do
       # wait for pod to come online fully, just in case
       sleep 60
       # start proxy to 3100 of the ingress gateway
-      nohup kubectl port-forward pods/\$(kubectl get pods --namespace istio-system | grep ingressgateway | cut -d" " -f 1) 3100:80 --namespace istio-system > /dev/null 2&>1 &
+      nohup kubectl port-forward pods/\$(kubectl get pods --namespace istio-system | grep ingressgateway | cut -d" " -f 1) 3100:80 --namespace istio-system >> /tmp/route.log 2&>1 &
       echo "proxy started"
       echo "proxy started" >> /tmp/route.log
       echo "connect to localhost:3100 to connect to kubeflow"
