@@ -176,3 +176,7 @@ variable "enable_logs_s3_sync" {
   type        = bool
   default     = true
 }
+
+variable "services" {
+type = list(string)
+}
