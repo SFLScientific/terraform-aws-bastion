@@ -1,0 +1,19 @@
+name: Argument tense check
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - '**.py'
+jobs:
+  spelling:
+    if: ${{ (github.head_ref != 'template-action-updates') }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Status Check for present tense args
+      uses: SFLScientific/PresentTenseArgs@master
+
+
+    

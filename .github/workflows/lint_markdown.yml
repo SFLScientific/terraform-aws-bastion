@@ -1,0 +1,19 @@
+name: Lint Markdown
+on: workflow_dispatch
+  # push:
+  #   branches-ignore: template-action-updates
+  #   paths:
+  #     - '**.md'
+jobs:
+  autopep8:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Lint changelog file
+        uses: docker://avtodev/markdown-lint:v1
+        with:
+            rules: '/lint/rules/changelog.js'
+            config: '/lint/config/changelog.yml'
+            args: '**.md'

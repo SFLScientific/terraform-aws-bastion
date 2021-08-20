@@ -1,0 +1,70 @@
+name: Pre-release-checks
+on:
+  workflow_dispatch:
+  release: 
+    types: [prereleased]
+
+jobs:
+  Pre-release-checks:
+    # Fetch the working branch
+    runs-on: ubuntu-latest
+    steps:
+    - name: Fetch the current master
+      uses: actions/checkout@master
+      with:
+        path: master
+        lfs: False
+
+    # Fetch the template
+    - name: Fetch the original template
+      uses: actions/checkout@master
+      with:
+        ref: template
+        path: template
+        lfs: False
+
+    # Run pre-release checks
+    - name: Release check
+      id: release_check
+      uses: SFLScientific/pre-relase-checks@v1.3
+
+    # Upload the pre-release check log
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1
+      if: always()
+      with:
+        name: Pre_release_check_log
+        path: pre_release_check.log
+
+    - name: Get md5sum for current readme pdf
+      if: always()
+      run: |
+        if [ $(find | grep -i "readme.pdf" | wc -l) -eq 0 ]; then 
+          echo "The could not the PDF version in readme file" > pdf_check.log
+          exit 1; 
+        fi;
+        md5sum $(find . -type f -iname readme.pdf) > temp.txt
+
+    - name: Converts all special chars to safe in the mds and makes backups
+      run: for F in $(find | grep -i "readme.md"); do cp $F $F.orig && sed -i 's/├/\+/g; s/│/\|/g;  s/─/-/g; s/└/\\/g' $F;done    
+    
+    - name: Convert Markdown to PDF
+      uses: valtyr/pandoc-action@v0.1-alpha
+    
+    - name: Compare the MD5 of two version of readme.pdf
+      run: |
+        echo $(md5sum -c temp.txt)
+        success=$(md5sum -c temp.txt | grep "OK" | wc -l)
+        if [ $success -eq 1 ]; then 
+          exit 0; 
+        else
+          echo "The readme.pdf does not match with readme.md" > pdf_check.log
+          exit 1; 
+        fi;
+    
+    - name: Upload PDF check log
+      uses: actions/upload-artifact@v1
+      if: always()
+      with:
+        name: Pre_release_check_log
+        path: pdf_check.log
