@@ -316,8 +316,9 @@ ${extra_user_data_content}
 ## Set env vars                       ##
 ########################################
 
+# ensure bashrc is there
 sudo -u ec2-user touch /home/ec2-user/.bashrc
-
+# as ec2-user add variables to bashrc
 sudo -u ec2-user python - <<EOF
 
 # get vars from terraform
@@ -339,8 +340,6 @@ EOF
 #######################################
 ## Run service setup                 ##
 #######################################
-
-export a="aaaaaaaa"
 
 # as ec2-user, run all service setup entrypoints
 # runs as ec2-user in a new bash shell, that will have all vars set
