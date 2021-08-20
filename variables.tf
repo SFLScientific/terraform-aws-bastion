@@ -180,3 +180,7 @@ variable "enable_logs_s3_sync" {
 variable "services" {
 type = list(string)
 }
+
+variable "bastion_variables" {
+  type = map(string)
+}

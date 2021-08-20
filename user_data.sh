@@ -204,6 +204,10 @@ chmod 700 /usr/bin/bastion/sync_users
 cat > /usr/bin/setup_services << EOF
 #!/usr/bin/env bash
 set -x
+
+# source bashrc to get vars for services setup
+source /home/ec2-user/.bashrc
+
 # make .kube for config
 mkdir -p /home/ec2-user/.kube
 
@@ -308,9 +312,36 @@ rm ~/mycron
 ${extra_user_data_content}
 
 
+########################################
+## Set env vars                       ##
+########################################
+
+sudo -u ec2-user touch /home/ec2-user/.bashrc
+
+sudo -u ec2-user python - <<EOF
+
+# get vars from terraform
+vars = ${bastion_variables}
+
+lines = []
+
+# add export cmds to run on bash init from variables to use
+for var,value in zip(vars.keys(),vars.values()):
+	lines.append("export {}=\"{}\"\n".format(var,value))
+
+# add line to .bashrc for user to access vars
+with open("/home/ec2-user/.bashrc","a") as bashrc:
+	for line in lines:
+		bashrc.write(line)
+
+EOF
+
 #######################################
 ## Run service setup                 ##
 #######################################
 
+export a="aaaaaaaa"
+
 # as ec2-user, run all service setup entrypoints
+# runs as ec2-user in a new bash shell, that will have all vars set
 sudo -u ec2-user bash /usr/bin/setup_services

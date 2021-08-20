@@ -359,6 +359,7 @@ resource "aws_launch_template" "bastion_launch_template" {
     passphrase              = var.passphrase
     team                    = var.team
     aws_region              = var.region
+    bastion_variables       = jsonencode(var.bastion_variables)
     bucket_name             = var.bucket_name
     extra_user_data_content = var.extra_user_data_content
     allow_ssh_commands      = var.allow_ssh_commands
