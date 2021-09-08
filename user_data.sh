@@ -248,15 +248,19 @@ for d in */ ; do
     # sorted alphabetically
     if test -f "entrypoint.sh"; then
         echo "found service setup entrypoint"
+        echo "found service setup entrypoint" >> /tmp/services_setup.log
         # make sure entrypoint is executable
         chmod +x entrypoint.sh
         # run it in current environment
         echo "running entrypoing for \$d"
+        echo "running entrypoing for \$d" >> /tmp/services_setup.log
         . ./entrypoint.sh  
     fi
     cd /tmp/tmp/${team}-services
 
 done
+
+echo "services deployed" >> /tmp/services_setup.log
 
 EOF
 
