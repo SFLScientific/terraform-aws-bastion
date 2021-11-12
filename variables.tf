@@ -180,6 +180,15 @@ variable "enable_logs_s3_sync" {
 variable "services" {
 type = list(string)
 }
+variable "subnets" {
+type = list(string)
+default = [""]
+}
+
+variable "cluster_security_group" {
+type = string
+default = ""
+}
 
 variable "bastion_variables" {
   type = map(string)
