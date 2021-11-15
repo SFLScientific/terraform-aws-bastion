@@ -190,7 +190,7 @@ chmod 700 /usr/bin/bastion/sync_users
 
 
 ###########################################
-## SETUP_SEVICES                         ##
+## SETUP_Kube                            ##
 ###########################################
 
 # wait for services gpg file to be uploaded to S3
@@ -199,9 +199,8 @@ chmod 700 /usr/bin/bastion/sync_users
 # decrypt the file into a tar archive
 # extract the tar archive
 # get the kubectl config file 
-# run entrypoint.sh for all service folders that were included
 
-cat > /usr/bin/setup_services << EOF
+cat > /usr/bin/setup_kube << EOF
 #!/usr/bin/env bash
 set -x
 
@@ -239,6 +238,24 @@ tar -xvf ${team}-services.tar.gz
 # copy kubeconfig into place
 cp /tmp/tmp/${team}-services/kubeconfig /home/ec2-user/.kube/config
 
+EOF
+
+chmod +x /usr/bin/setup_kube
+
+###########################################
+## SETUP_SEVICES                         ##
+###########################################
+
+# cd to services setup
+# run entrypoint.sh for all service folders that were included
+
+cat > /usr/bin/setup_services << EOF
+#!/usr/bin/env bash
+set -x
+
+# source bashrc to get vars for services setup
+source /home/ec2-user/.bashrc
+
 # go to services location
 cd /tmp/tmp/${team}-services
 for d in */ ; do
@@ -273,8 +290,6 @@ chmod +x /usr/bin/setup_services
 
 # automates this setup "eks vpc install instructions".txt
 
-#
-
 cat > /usr/bin/setup_cni << EOF
 #!/usr/bin/env bash
 set -x
@@ -282,11 +297,9 @@ set -x
 # source bashrc to get vars for services setup
 source /home/ec2-user/.bashrc
 
-# TODO
-# get SG IDs for SG 1 and SG 2 
-# SGs are SGs that the EKS module makes and deploys into
-# these can be got from describe nodes, or from templating the vars through from TF
-
+# location for yaml files to be created
+mkdir /tmp/cni
+cd /tmp/cni
 
 #install CNI plugin
 kubectl apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/release-1.7/config/v1.7/aws-k8s-cni.yaml
@@ -296,54 +309,45 @@ kubectl apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/releas
 kubectl set env ds aws-node -n kube-system AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG=true
 kubectl describe daemonset aws-node -n kube-system | grep -A5 Environment
 
-# TODO check {team} worked
-# TODO check that instance_IDS is OK after TF templating
 #Terminate worker nodes so that Autoscaling launches newer nodes that come bootstrapped with custom network config
-INSTANCE_IDS=(`aws ec2 describe-instances --query 'Reservations[*].Instances[*].InstanceId' --filters "Name=tag-key,Values=eks:cluster-name" "Name=tag-value,Values=$team}*" --output text` )
-# TODO for loop with no capitle 2
+INSTANCE_IDS=\$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].InstanceId' --filters "Name=tag-key,Values=eks:cluster-name" "Name=tag-value,Values=\$team*" --output text --region \$region)
+echo \$INSTANCE_IDS
+for instance in \$INSTANCE_IDS
 do
-	echo "Terminating EC2 instance $i ..."
-	aws ec2 terminate-instances --instance-ids $i
+    aws ec2 terminate-instances --instance-ids \$instance --region \$region
 done
 
-# TODO
+
 # wait until all nodes have come back up
-# make logic for this
+sleep 600
 
-
-# TODO
 # install jq if not already
+sudo yum install -y jq
 
-# TODO
+
 #Create custom resources for each subnet by replacing Subnet and SecurityGroup IDs. Since we created two secondary subnets, we need create two custom resources.
 #populate CRD YAML files
 
 # make group1.yaml from subnet 1
-apiVersion: crd.k8s.amazonaws.com/v1alpha1
+echo "apiVersion: crd.k8s.amazonaws.com/v1alpha1
 kind: ENIConfig
 metadata:
- name: group2-pod-netconfig
+ name: group1-pod-netconfig
 spec:
  subnet: ${subnet_one}
  securityGroups:
- - ${security_group}
+ - ${security_group}" > group1.yaml
 
 
 # make group2.yaml from subnet 2
-apiVersion: crd.k8s.amazonaws.com/v1alpha1
+echo "apiVersion: crd.k8s.amazonaws.com/v1alpha1
 kind: ENIConfig
 metadata:
  name: group2-pod-netconfig
 spec:
  subnet: ${subnet_two}
  securityGroups:
- - ${security_group}
-
-
-
-
-
-
+ - ${security_group}" > group2.yaml
 
 
 #add each subnet and security group
@@ -351,18 +355,37 @@ kubectl create -f group1.yaml
 kubectl create -f group2.yaml
 
 
-
-
-# TODO
 #annotate nodes with custom network config
 # this tells each node based on which SG/subnet its in, what its CNI config is
-kubectl annotate node <nodename>.<region>.compute.internal k8s.amazonaws.com/eniConfig=group1-pod-netconfig
+#       kubectl annotate node <nodename>.<region>.compute.internal k8s.amazonaws.com/eniConfig=group1-pod-netconfig
 #attach proper node to region associated, for example both are in USEAST1A which corresponds to subnet-0ab2d7841307a2210 and group1.yaml
 #this maps to "group1-pod-netconfig" of eniconfig.crd.k8s.amazonaws.com/group1-pod-netconfig configured
 
-kubectl annotate node ip-10-224-125-132.ec2.internal k8s.amazonaws.com/eniConfig=group1-pod-netconfig
-kubectl annotate node ip-10-224-125-158.ec2.internal k8s.amazonaws.com/eniConfig=group1-pod-netconfig
+# assign zone_one and zone_two vars from subnet ids
+zone_one=\$(aws ec2 describe-subnets --subnet-ids ${subnet_one} --region \$region | grep AvailabilityZone | grep -v Id | cut -d'-' -f3 | rev | cut -c4- | rev)
+zone_two=\$(aws ec2 describe-subnets --subnet-ids ${subnet_two} --region \$region | grep AvailabilityZone | grep -v Id | cut -d'-' -f3 | rev | cut -c4- | rev)
 
+# for all nodes / output in this cmd output
+NODES=\$(kubectl get nodes)
+for node in \$NODES
+do
+    # get the zone that the node is in    
+    zone="na"
+    echo \$node | grep compute  && export zone=\$(kubectl describe node \$node | grep zone | grep top | cut -d'-' -f3) || echo "" > /dev/null
+
+    # if the output we are iterating over is a valid node, its zone will match one or two
+    # and will annotate to the correct one
+    if [[ \$zone == \$zone_one ]]
+    then
+      kubectl annotate node \$node k8s.amazonaws.com/eniConfig=group1-pod-netconfig
+    elif [[ \$zone == \$zone_two ]]
+    then
+      kubectl annotate node \$node k8s.amazonaws.com/eniConfig=group2-pod-netconfig
+    else
+      echo "not applicable" > /dev/null
+    fi
+    
+done
 
 # TODO automatically do the above section on scaling event
 
@@ -450,12 +473,14 @@ EOF
 ## Run service setup                 ##
 #######################################
 
+# as ec2-user, setup kube stuff before anything else
+# runs as ec2-user in a new bash shell, that will have all vars set
+sudo -u ec2-user bash /usr/bin/setup_kube
+
 # as ec2-user, run all cni setup before services
 # runs as ec2-user in a new bash shell, that will have all vars set
-#sudo -u ec2-user bash /usr/bin/setup_cni
-# TODO auto run cni setup
+sudo -u ec2-user bash /usr/bin/setup_cni
 
 # as ec2-user, run all service setup entrypoints
 # runs as ec2-user in a new bash shell, that will have all vars set
-#sudo -u ec2-user bash /usr/bin/setup_services
-# TODO re-enable services once CNI looks to be working
+sudo -u ec2-user bash /usr/bin/setup_services
