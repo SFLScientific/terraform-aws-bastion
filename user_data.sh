@@ -371,7 +371,7 @@ for node in \$NODES
 do
     # get the zone that the node is in    
     zone="na"
-    echo \$node | grep compute  && export zone=\$(kubectl describe node \$node | grep zone | grep top | cut -d'-' -f3) || echo "" > /dev/null
+    echo \$node | grep ec2 && export zone=\$(kubectl describe node \$node | grep zone | grep top | cut -d'-' -f3) || echo "" > /dev/null
 
     # if the output we are iterating over is a valid node, its zone will match one or two
     # and will annotate to the correct one
