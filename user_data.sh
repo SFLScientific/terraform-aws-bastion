@@ -277,6 +277,10 @@ for d in */ ; do
 
 done
 
+
+# regenerate kubeconfig
+aws eks --region $region update-kubeconfig --name "$team"-eks-cluster
+
 echo "services deployed" >> /tmp/services_setup.log
 
 EOF
@@ -308,6 +312,9 @@ kubectl apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/releas
 #Edit aws-node DaemonSet and add AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG environment variable to the node container spec and set it to true
 kubectl set env ds aws-node -n kube-system AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG=true
 kubectl describe daemonset aws-node -n kube-system | grep -A5 Environment
+
+# wait for all instances to be online
+sleep 600
 
 #Terminate worker nodes so that Autoscaling launches newer nodes that come bootstrapped with custom network config
 INSTANCE_IDS=\$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].InstanceId' --filters "Name=tag-key,Values=eks:cluster-name" "Name=tag-value,Values=\$team*" --output text --region \$region)
