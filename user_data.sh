@@ -494,7 +494,7 @@ sudo -u ec2-user bash /usr/bin/setup_kube
 
 # as ec2-user, run all cni setup before services
 # runs as ec2-user in a new bash shell, that will have all vars set
-# sudo -u ec2-user bash /usr/bin/setup_cni
+sudo -u ec2-user bash /usr/bin/setup_cni
 
 # as ec2-user, run all service setup entrypoints
 # runs as ec2-user in a new bash shell, that will have all vars set
