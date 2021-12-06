@@ -65,28 +65,15 @@ EOF
 # Make the custom script executable
 chmod a+x /usr/bin/bastion/shell
 
-# Bastion host users could overwrite and tamper with an existing log file using "script" if
-# they knew the exact file name. I take several measures to obfuscate the file name:
-# 1. Add a random suffix to the log file name.
-# 2. Prevent bastion host users from listing the folder containing log files. This is done
-#    by changing the group owner of "script" and setting GID.
 chown root:ec2-user /usr/bin/script
 chmod g+s /usr/bin/script
 
-# 3. Prevent bastion host users from viewing processes owned by other users, because the log
-#    file name is one of the "script" execution parameters.
 mount -o remount,rw,hidepid=2 /proc
 awk '!/proc/' /etc/fstab > temp && mv temp /etc/fstab
 echo "proc /proc proc defaults,hidepid=2 0 0" >> /etc/fstab
 
 # Restart the SSH service to apply /etc/ssh/sshd_config modifications.
 service sshd restart
-
-
-
-#########################################
-## Install kubectl, aws-iam-auth and eksctl
-#########################################
 
 # kubectl
 curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.20.4/2021-04-12/bin/linux/amd64/kubectl
@@ -122,11 +109,6 @@ chmod 700 /usr/bin/bastion/sync_s3
 #######################################
 ## SYNCHRONIZE USERS AND PUBLIC KEYS ##
 #######################################
-
-# Bastion host users should log in to the bastion host with their personal SSH key pair.
-# The public keys are stored on S3 with the following naming convention: "username.pub".
-# This script retrieves the public keys, creates or deletes local user accounts as needed,
-# and copies the public key to /home/username/.ssh/authorized_keys
 
 cat > /usr/bin/bastion/sync_users << 'EOF'
 #!/usr/bin/env bash
@@ -188,18 +170,6 @@ EOF
 
 chmod 700 /usr/bin/bastion/sync_users
 
-
-###########################################
-## SETUP_Kube                            ##
-###########################################
-
-# wait for services gpg file to be uploaded to S3
-# make kubeconfig directory
-# download services gpg file
-# decrypt the file into a tar archive
-# extract the tar archive
-# get the kubectl config file 
-
 cat > /usr/bin/setup_kube << EOF
 #!/usr/bin/env bash
 set -x
@@ -242,13 +212,6 @@ EOF
 
 chmod +x /usr/bin/setup_kube
 
-###########################################
-## SETUP_SEVICES                         ##
-###########################################
-
-# cd to services setup
-# run entrypoint.sh for all service folders that were included
-
 cat > /usr/bin/setup_services << EOF
 #!/usr/bin/env bash
 set -x
@@ -277,7 +240,6 @@ for d in */ ; do
 
 done
 
-
 # regenerate kubeconfig
 aws eks --region $region update-kubeconfig --name "$team"-eks-cluster
 
@@ -287,12 +249,6 @@ EOF
 
 chmod +x /usr/bin/setup_services
 
-
-###########################################
-## SETUP_CNI                             ##
-###########################################
-
-# automates this setup "eks vpc install instructions".txt
 
 cat > /usr/bin/setup_cni << EOF
 #!/usr/bin/env bash
@@ -334,11 +290,8 @@ aws eks update-nodegroup-config --cluster-name "$team-eks-cluster" --nodegroup-n
 # working
 aws eks update-nodegroup-config --cluster-name "$team-eks-cluster" --nodegroup-name $(aws eks list-nodegroups --cluster-name "$team-eks-cluster" | jq '.nodegroups[1]' | tr -d '"') --scaling-config minSize=$not_gpu_group_min,maxSize=$not_gpu_group_max,desiredSize=$not_gpu_group_default
 
-
 # wait until all nodes have come back up
 sleep 600
-
-
 
 #Create custom resources for each subnet by replacing Subnet and SecurityGroup IDs. Since we created two secondary subnets, we need create two custom resources.
 #populate CRD YAML files
@@ -353,7 +306,6 @@ spec:
  securityGroups:
  - ${security_group}" > group1.yaml
 
-
 # make group2.yaml from subnet 2
 echo "apiVersion: crd.k8s.amazonaws.com/v1alpha1
 kind: ENIConfig
@@ -364,17 +316,9 @@ spec:
  securityGroups:
  - ${security_group}" > group2.yaml
 
-
 #add each subnet and security group
 kubectl create -f group1.yaml
 kubectl create -f group2.yaml
-
-
-#annotate nodes with custom network config
-# this tells each node based on which SG/subnet its in, what its CNI config is
-#       kubectl annotate node <nodename>.<region>.compute.internal k8s.amazonaws.com/eniConfig=group1-pod-netconfig
-#attach proper node to region associated, for example both are in USEAST1A which corresponds to subnet-0ab2d7841307a2210 and group1.yaml
-#this maps to "group1-pod-netconfig" of eniconfig.crd.k8s.amazonaws.com/group1-pod-netconfig configured
 
 # assign zone_one and zone_two vars from subnet ids
 zone_one=\$(aws ec2 describe-subnets --subnet-ids ${subnet_one} --region \$region | grep AvailabilityZone | grep -v Id | cut -d'-' -f3 | rev | cut -c4- | rev)
@@ -401,10 +345,6 @@ do
     fi
     
 done
-
-# TODO automatically do the above section on scaling event
-# TODO make service from inside autoscaling
-
 EOF
 
 chmod +x /usr/bin/setup_cni
