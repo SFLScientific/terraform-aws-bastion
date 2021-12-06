@@ -324,12 +324,20 @@ do
     aws ec2 terminate-instances --instance-ids \$instance --region \$region
 done
 
+# install jq if not already
+sudo yum install -y jq
+
+# set node groups to needed sizes specified from TF
+# working
+aws eks update-nodegroup-config --cluster-name "$team-eks-cluster" --nodegroup-name $(aws eks list-nodegroups --cluster-name "$team-eks-cluster" | jq '.nodegroups[0]' | tr -d '"') --scaling-config minSize=$gpu_group_min,maxSize=$gpu_group_max,desiredSize=$gpu_group_default
+
+# working
+aws eks update-nodegroup-config --cluster-name "$team-eks-cluster" --nodegroup-name $(aws eks list-nodegroups --cluster-name "$team-eks-cluster" | jq '.nodegroups[1]' | tr -d '"') --scaling-config minSize=$not_gpu_group_min,maxSize=$not_gpu_group_max,desiredSize=$not_gpu_group_default
+
 
 # wait until all nodes have come back up
 sleep 600
 
-# install jq if not already
-sudo yum install -y jq
 
 
 #Create custom resources for each subnet by replacing Subnet and SecurityGroup IDs. Since we created two secondary subnets, we need create two custom resources.
@@ -395,7 +403,7 @@ do
 done
 
 # TODO automatically do the above section on scaling event
-
+# TODO make service from inside autoscaling
 
 EOF
 
@@ -486,7 +494,7 @@ sudo -u ec2-user bash /usr/bin/setup_kube
 
 # as ec2-user, run all cni setup before services
 # runs as ec2-user in a new bash shell, that will have all vars set
-sudo -u ec2-user bash /usr/bin/setup_cni
+# sudo -u ec2-user bash /usr/bin/setup_cni
 
 # as ec2-user, run all service setup entrypoints
 # runs as ec2-user in a new bash shell, that will have all vars set
