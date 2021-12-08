@@ -284,11 +284,8 @@ done
 sudo yum install -y jq
 
 # set node groups to needed sizes specified from TF
-# working
-aws eks update-nodegroup-config --cluster-name "$team-eks-cluster" --nodegroup-name $(aws eks list-nodegroups --cluster-name "$team-eks-cluster" | jq '.nodegroups[0]' | tr -d '"') --scaling-config minSize=$gpu_group_min,maxSize=$gpu_group_max,desiredSize=$gpu_group_default
-
-# working
-aws eks update-nodegroup-config --cluster-name "$team-eks-cluster" --nodegroup-name $(aws eks list-nodegroups --cluster-name "$team-eks-cluster" | jq '.nodegroups[1]' | tr -d '"') --scaling-config minSize=$not_gpu_group_min,maxSize=$not_gpu_group_max,desiredSize=$not_gpu_group_default
+aws eks update-nodegroup-config --cluster-name "\$team-eks-cluster" --nodegroup-name \$(aws eks list-nodegroups --cluster-name "\$team-eks-cluster" --region \$region | jq '.nodegroups[0]' | tr -d '"') --scaling-config minSize=\$gpu_group_min,maxSize=\$gpu_group_max,desiredSize=\$gpu_group_default --region \$region
+aws eks update-nodegroup-config --cluster-name "\$team-eks-cluster" --nodegroup-name \$(aws eks list-nodegroups --cluster-name "\$team-eks-cluster" --region \$region| jq '.nodegroups[1]' | tr -d '"') --scaling-config minSize=\$not_gpu_group_min,maxSize=\$not_gpu_group_max,desiredSize=\$not_gpu_group_default --region \$region
 
 # wait until all nodes have come back up
 sleep 600
