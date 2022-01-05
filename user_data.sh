@@ -270,7 +270,7 @@ kubectl set env ds aws-node -n kube-system AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG=tr
 kubectl describe daemonset aws-node -n kube-system | grep -A5 Environment
 
 # wait for all instances to be online
-sleep 600
+sleep 300
 
 #Terminate worker nodes so that Autoscaling launches newer nodes that come bootstrapped with custom network config
 INSTANCE_IDS=\$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].InstanceId' --filters "Name=tag-key,Values=eks:cluster-name" "Name=tag-value,Values=\$team*" --output text --region \$region)
@@ -288,7 +288,7 @@ aws eks update-nodegroup-config --cluster-name "\$team-eks-cluster" --nodegroup-
 aws eks update-nodegroup-config --cluster-name "\$team-eks-cluster" --nodegroup-name \$(aws eks list-nodegroups --cluster-name "\$team-eks-cluster" --region \$region| jq '.nodegroups[1]' | tr -d '"') --scaling-config minSize=\$not_gpu_group_min,maxSize=\$not_gpu_group_max,desiredSize=\$not_gpu_group_default --region \$region
 
 # wait until all nodes have come back up
-sleep 600
+sleep 300
 
 #Create custom resources for each subnet by replacing Subnet and SecurityGroup IDs. Since we created two secondary subnets, we need create two custom resources.
 #populate CRD YAML files

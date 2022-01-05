@@ -68,6 +68,11 @@ variable "bastion_security_group_id" {
   default     = ""
 }
 
+variable "bastion_host_role" {
+  description = "IAM role .name to assign to bastion instance profile"
+  default     = ""
+}
+
 variable "bastion_additional_security_groups" {
   description = "List of additional security groups to attach to the launch template"
   type        = list(string)

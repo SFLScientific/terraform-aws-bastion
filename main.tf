@@ -333,7 +333,12 @@ resource "aws_lb_listener" "bastion_lb_listener_22" {
 }
 
 resource "aws_iam_instance_profile" "bastion_host_profile" {
-  role = aws_iam_role.bastion_host_role.name
+  
+  # original
+  # role = aws_iam_role.bastion_host_role.name
+  # TODO better this / rm old role and have it use the new one, or have it update new/var one 
+  # modified
+  role = var.bastion_host_role
   path = "/"
 }
 
