@@ -240,9 +240,6 @@ for d in */ ; do
 
 done
 
-# regenerate kubeconfig
-aws eks --region $region update-kubeconfig --name "$team"-eks-cluster
-
 echo "services deployed" >> /tmp/services_setup.log
 
 EOF
